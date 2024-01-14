@@ -1,0 +1,199 @@
+﻿
+<button type="button" class="btn btn-success mb-3" data-toggle="modal" data-target="#product_detail" id="show_btn">
+    Create Product
+</button>
+
+
+<div id="spinner" class="spinner-border text-success align-items-center" role="status" @* style="display: none;position: fixed;top: 32%;left: 50%;" *@>
+    <span class="visually-hidden">Loading...</span>
+</div>
+<div class="container">
+    <div class="panel panel-default">
+        <table class="table table-product-list" id="product_table" @* style="table-layout:fixed;" *@></table>
+    </div>
+</div>
+<partial name="_PartialProduct" />
+<script>
+    var productTable = $('#product_table').DataTable({
+        columns: [
+            {
+                title: "Image", render: function (data, type, row) {
+                    return '<img src="' + getFileName(row.imageUrl) + '" width="50px"/>';
+                }
+            },
+            { title: "Name", data: "name" },
+            {
+                title: "Price", render: function (data, type, row) {
+                    return numberWithCommas(row.price) + ' MMK';
+                }
+            },
+            { title: "Description.", render: function (data, type, row) {
+                    return '<div class="desc-brief">' + row.description + '</div>';
+                }
+            },
+            {
+                title: "Actions", render: function (data, type, row) {
+                    return '<button class="btn btn-warning btn-sm mx-auto" style="margin-right:10px!important;" onclick="editProduct(\'' + row.productId + '\')">Edit</button>' +
+                        '<button class="btn btn-danger btn-sm mx-auto" onclick="deleteProduct(\'' + row.productId + '\')">Delete</button>';
+                }
+            }
+        ]
+    });
+
+    var productEmptyObj = {
+        productId:'',
+        name: '',
+        price: 0,
+        imageUrl:'',
+        description:'',
+    };
+
+ $(document).ready(function () {
+    $.noConflict();
+    getAllProducts();
+
+    jQuery('#show_btn').on('click', function () {
+        loadProductRecord(productEmptyObj);
+        popupToggle('show');
+    });
+
+    jQuery('#hide_btn').on('click', function () {
+        popupToggle('hide');
+    });
+});
+
+function createProduct() {
+    if ($("#productname").val() == "" || $("#productname").val() == null) {
+        $("#namerr").html("Name is required.");
+        return;
+    } else { $("#namerr").html("") }
+
+    $.ajax({
+        url: "/Product/Save",
+        type: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({
+            ProductId: $("#productid").val(),
+            Name: $("#productname").val(),
+            Price: $("#price").val(),
+            ImageUrl: '',
+            Description: $("#description").val(),
+        }),
+        dataType: "json",
+        cache: false,
+        success: function (result) {
+            popupToggle('hide');
+            getAllProducts();
+        },
+        error: function (err) {
+            alert("Error: " + err.status + " " + err.statusText);
+        }
+    });
+}
+
+function uploadPhoto() {
+    var formData = new FormData();
+    formData.append("file", $("#fileInput")[0].files[0]);
+
+    var url = "/Product/UploadPhoto?productId=" + encodeURIComponent($("#productid").val());
+
+    $.ajax({
+        url: url,
+        type: "POST",
+        data: formData,
+        contentType: false,
+        processData: false,
+        success: function (result) {
+            $("#image").attr("src", getFileName(result.data));
+            getAllProducts();
+        },
+        error: function (err) {
+            alert("Error: " + err.statusText);
+        }
+    });
+}
+
+function getAllProducts() {
+    $.ajax({
+        url: "/Product/GetAll",
+        type: "GET",
+        contentType: "application/json", // Set content type to JSON
+        dataType: "json",
+        cache: false,
+        beforeSend: function () {
+                $('#spinner').show();
+        },
+        success: function (result) {
+            productTable.clear().rows.add(result).draw();
+        },
+        complete: function () {
+                $('#spinner').hide();
+        },
+        error: function (err) {
+            alert("Error: " + err.status + " " + err.statusText);
+        }
+    });
+}
+
+function editProduct(id) {
+    $.ajax({
+        url: "/Product/Get?id="+id,
+        type: "GET",
+        contentType: "application/json", // Set content type to JSON
+        dataType: "json",
+        cache: false,
+        success: function (result) {
+                popupToggle('show');
+                loadProductRecord(result.data);
+                getAllProducts();
+            },
+        error: function (err) {
+            alert("Error: " + err.status + " " + err.statusText);
+        }
+    });
+}
+
+function deleteProduct(id) {
+    $.ajax({
+        url: "/Product/Delete?id="+id,
+        type: "DELETE",
+        contentType: "application/json", // Set content type to JSON
+        dataType: "json",
+        cache: false,
+        success: function (result) {
+            getAllProducts();
+        },
+        error: function (err) {
+            alert("Error: " + err.status + " " + err.statusText);
+        }
+    });
+}
+
+function numberWithCommas(x) {
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function popupToggle(event) {
+    jQuery('#product_detail').modal(event);
+}
+
+function getFileName(imageUrl) {
+    var imageFileName = imageUrl != null && imageUrl != "" ? imageUrl.split('\\').pop() : 'ImageNotFound.jpg';
+    var imagePath = '/uploads/' + imageFileName;
+    return imagePath;
+}
+
+function loadProductRecord(product) {
+    $("#productid").val(product.productId);
+    $("#productname").val(product.name);
+    $("#price").val(product.price);
+    $("#description").val(product.description);
+    $("#image").attr("src", getFileName(product.imageUrl));
+    $("#namerr").html("");
+    if (product.productId != '') {
+        $("#upload_btn").attr('disabled', false);
+    } else {
+        $("#upload_btn").attr('disabled', true);
+    }
+}
+</script>
